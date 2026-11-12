@@ -39,24 +39,139 @@ func main() {
 			} else {
 				fmt.Println("清空数据库成功")
 			}
+		case "STRLEN":
+			if len(args) != 2 {
+				fmt.Printf("用法：%s key\n", command)
+				continue
+			}
+			fmt.Println(redis.StrLen(args[1]))
+		case "MSET":
+			if len(args)%2 == 0 || len(args) == 1 {
+				fmt.Printf("用法：%s key value [key value]\n", command)
+				continue
+			}
+			pair := make([]db.Pair, 0, (len(args)-1)/2)
+			for i := 1; i < len(args); i += 2 {
+				pair = append(pair, db.Pair{
+					Key:   args[i],
+					Value: args[i+1],
+				})
+			}
+			redis.MSet(pair...)
+			if err := db.Save(dataPath, redis); err != nil {
+				log.Printf("保存数据库失败：%v", err)
+				continue
+			}
+			fmt.Println("OK")
+		case "INCRBY":
+			if len(args) != 3 {
+				fmt.Printf("用法：%s key increment\n", command)
+				continue
+			}
+			value, err := strconv.Atoi(args[2])
+			if err != nil {
+				fmt.Println("必须为整数")
+				continue
+			}
+			n, err := redis.IncrBy(args[1], value)
+			if err != nil {
+				log.Println("key中值非整数")
+				continue
+			}
+			if err := db.Save(dataPath, redis); err != nil {
+				log.Printf("保存数据库失败：%v", err)
+				continue
+			}
+			fmt.Println(n)
+		case "APPEND":
+			if len(args) != 3 {
+				fmt.Printf("用法：%s key value\n", command)
+				continue
+			}
+			n, err := redis.Append(args[1], args[2])
+			if err != nil {
+				log.Println("key不是string类型")
+				continue
+			}
+			if err := db.Save(dataPath, redis); err != nil {
+				log.Printf("保存数据库失败：%v", err)
+				continue
+			}
+			fmt.Println(n)
+		case "DECRBY":
+			if len(args) != 3 {
+				fmt.Printf("用法：%s key increment\n", command)
+				continue
+			}
+			value, err := strconv.Atoi(args[2])
+			if err != nil {
+				fmt.Println("必须为整数")
+				continue
+			}
+			n, err := redis.DecrBY(args[1], value)
+			if err != nil {
+				log.Println("key中值非整数")
+				continue
+			}
+			if err := db.Save(dataPath, redis); err != nil {
+				log.Printf("保存数据库失败：%v", err)
+				continue
+			}
+			fmt.Println(n)
+		case "INCR":
+			if len(args) != 2 {
+				fmt.Printf("用法：%s key\n", command)
+				continue
+			}
+			n, err := redis.Incr(args[1])
+			if err != nil {
+				log.Println("key中值非整数")
+				continue
+			}
+			if err := db.Save(dataPath, redis); err != nil {
+				log.Printf("保存数据库失败：%v", err)
+				continue
+			}
+			fmt.Println(n)
+		case "DECR":
+			if len(args) != 2 {
+				fmt.Printf("用法：%s key\n", command)
+				continue
+			}
+			n, err := redis.Decr(args[1])
+			if err != nil {
+				log.Println("key中值非整数")
+				continue
+			}
+			if err := db.Save(dataPath, redis); err != nil {
+				log.Printf("保存数据库失败：%v", err)
+				continue
+			}
+			fmt.Println(n)
+		case "SETNX":
+			if len(args) != 3 {
+				fmt.Printf("用法：%s key value\n", command)
+				continue
+			}
+			n := redis.SetNx(args[1], args[2])
+			if n == 0 {
+				fmt.Println(0)
+				continue
+			}
+			if err := db.Save(dataPath, redis); err != nil {
+				log.Printf("保存数据库失败：%v", err)
+				continue
+			}
+			fmt.Println(n)
 		case "MGET":
 			if len(args) < 2 {
 				fmt.Printf("用法：%s key [key...]\n", command)
 				continue
 			}
-			if len(args) == 2 {
-				value, err := redis.Get(args[1])
-				if err != nil {
-					log.Printf("查找失败:%v\n", err)
-					continue
-				}
-				fmt.Println(value)
-			} else {
-				keys := args[1:]
-				value := redis.MGet(keys...)
-				for _, v := range value {
-					fmt.Println(v)
-				}
+			keys := args[1:]
+			value := redis.MGet(keys...)
+			for _, v := range value {
+				fmt.Println(v)
 			}
 		case "DEL":
 			if len(args) != 2 {

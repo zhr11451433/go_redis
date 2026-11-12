@@ -2,6 +2,7 @@ package db
 
 import (
 	"errors"
+	"strconv"
 	"time"
 )
 
@@ -63,4 +64,88 @@ func (r *Redis) MGet(Keys ...string) []any {
 		keys = append(keys, entry.KeyValue)
 	}
 	return keys
+}
+
+type Pair struct {
+	Key   string
+	Value string
+}
+
+func (r *Redis) MSet(P ...Pair) {
+	for _, p := range P {
+		key := p.Key
+		value := p.Value
+		r.Set(key, value)
+	}
+}
+
+// SetNx 仅在 key 不存在时设置 key-value。若 key 存在则不执行任何操作
+func (r *Redis) SetNx(key, value string) int {
+	_, ok := r.Find(key)
+	if ok {
+		return 0
+	}
+	r.Set(key, value)
+	return 1
+}
+
+func (r *Redis) StrLen(key string) int {
+	entry, ok := r.Find(key)
+	if !ok {
+		return 0
+	}
+	//类型不对简化返回0
+	if entry.KeyType != "string" {
+		return 0
+	}
+	return len(entry.KeyValue)
+}
+
+func (r *Redis) IncrBy(key string, n int) (int, error) {
+	entry, ok := r.Find(key)
+	if !ok {
+		r.Set(key, strconv.Itoa(n))
+		return n, nil
+	}
+	m, err := strconv.Atoi(entry.KeyValue)
+	if err != nil {
+		return 0, err
+	}
+	r.Set(key, strconv.Itoa(n+m))
+	return m + n, nil
+}
+
+func (r *Redis) Incr(key string) (int, error) {
+	return r.IncrBy(key, 1)
+}
+
+func (r *Redis) DecrBY(key string, n int) (int, error) {
+	entry, ok := r.Find(key)
+	if !ok {
+		r.Set(key, strconv.Itoa(-n))
+		return -n, nil
+	}
+	m, err := strconv.Atoi(entry.KeyValue)
+	if err != nil {
+		return 0, err
+	}
+	r.Set(key, strconv.Itoa(m-n))
+	return m - n, nil
+}
+
+func (r *Redis) Decr(key string) (int, error) {
+	return r.DecrBY(key, 1)
+}
+
+func (r *Redis) Append(key, value string) (int, error) {
+	entry, ok := r.Find(key)
+	if !ok {
+		r.Set(key, value)
+		return len(value), nil
+	}
+	if entry.KeyType != "string" {
+		return 0, errors.New("key is not string")
+	}
+	entry.KeyValue = entry.KeyValue + value
+	return r.StrLen(key), nil
 }
